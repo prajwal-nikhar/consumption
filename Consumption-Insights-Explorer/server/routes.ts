@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import * as xlsx from "xlsx";
+import xlsx from "xlsx";
 import fs from "fs";
 import path from "path";
 import multer from "multer";
