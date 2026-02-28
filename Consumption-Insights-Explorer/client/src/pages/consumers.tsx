@@ -47,7 +47,7 @@ export default function Consumers() {
                   />
                   <Tooltip 
                     cursor={{ fill: 'hsl(var(--secondary))', opacity: 0.5 }}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px 16px' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                     formatter={(value: number) => [`${value.toLocaleString()} kWh`, 'Consumption']}
                   />
                   <Bar dataKey="totalConsumption" radius={[0, 6, 6, 0]} maxBarSize={32}>

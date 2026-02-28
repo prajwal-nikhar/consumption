@@ -65,36 +65,72 @@ async function processExcel(filePath: string) {
       difference: String(difference),
       totalReading: String(totalReading),
       remark: row["REMARK"] ? String(row["REMARK"]) : null,
-      isAnomaly
+      isAnomaly,
+      KWH_Lag_1_used: 0, // Placeholder, will be updated later
+      KWH_RollingMean_7_used: 0 // Placeholder, will be updated later
     });
   }
 
-  await storage.seedConsumptionData(consumptionRecords);
+  // Feature Engineering (Lag and Rolling Mean)
+  const recordsWithFeatures = Array.from(locations).flatMap(loc => {
+    const locRecords = consumptionRecords.filter(r => r.location === loc).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const readings = locRecords.map(r => Number(r.totalReading));
+    
+    return locRecords.map((record, index) => {
+      const lag1 = index > 0 ? readings[index - 1] : 0;
+      const rollingMean7 = readings.slice(Math.max(0, index - 6), index + 1).reduce((a, b) => a + b, 0) / Math.min(7, index + 1);
+      
+      return {
+        ...record,
+        KWH_Lag_1_used: lag1,
+        KWH_RollingMean_7_used: rollingMean7
+      };
+    });
+  });
+
+  await storage.seedConsumptionData(recordsWithFeatures);
   
   const predictionRecords = [];
-  // Use a simple Random Forest-like logic (Simplified for JS)
-  // Feature extraction: Day of week, Month, etc.
+  // Random Forest-like prediction logic (simplified)
   for (const loc of Array.from(locations)) {
-    // Get last known total reading for this location
-    const locRecords = consumptionRecords.filter(r => r.location === loc);
-    const lastReading = locRecords.length > 0 ? Number(locRecords[locRecords.length - 1].totalReading) : 500;
-    
+    const locRecords = recordsWithFeatures.filter(r => r.location === loc).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (locRecords.length === 0) continue;
+
+    const lastRecord = locRecords[locRecords.length - 1];
+    let lastReading = Number(lastRecord.totalReading);
+    let lastLag1 = Number(lastRecord.KWH_Lag_1_used);
+    let lastRollingMean7 = Number(lastRecord.KWH_RollingMean_7_used);
+
     for (let i = 1; i <= 12; i++) {
-      let d = new Date(2025, 5 + i, 1);
-      // Prediction logic: Mean + seasonality (simplified implementation of the notebook's RF)
+      const d = new Date(2025, 5 + i, 1);
       const month = d.getMonth();
-      const seasonality = Math.sin((month / 12) * Math.PI * 2) * 500; 
-      const predictedVal = Math.max(0, lastReading + seasonality + (Math.random() - 0.5) * 200);
-      
+      const year = d.getFullYear();
+      const quarter = Math.floor(month / 3) + 1;
+
+      // Simplified prediction based on features
+      const predictedVal = Math.max(0, (lastReading * 0.5) + (lastLag1 * 0.2) + (lastRollingMean7 * 0.3) + (Math.sin(month / 6 * Math.PI) * 500));
+
       predictionRecords.push({
         location: loc,
         date: d.toISOString().split('T')[0],
-        predictedConsumption: String(Math.round(predictedVal))
+        predictedConsumption: String(Math.round(predictedVal)),
+        Year: year,
+        Month: month + 1,
+        Quarter: quarter,
+        KWH_Lag_1_used: lastLag1,
+        KWH_RollingMean_7_used: lastRollingMean7,
+        TOTAL_READING_KWH: lastReading
       });
+
+      lastLag1 = lastReading;
+      lastReading = predictedVal;
+      // Update rolling mean - simplified
+      lastRollingMean7 = ((lastRollingMean7 * 6) + predictedVal) / 7;
     }
   }
   await storage.seedPredictionData(predictionRecords);
 }
+
 
 async function seedDatabase() {
   const hasData = await storage.hasConsumptionData();

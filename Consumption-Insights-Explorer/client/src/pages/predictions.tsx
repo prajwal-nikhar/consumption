@@ -5,8 +5,41 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from "recharts";
-import { format, addMonths } from "date-fns";
+import { format } from "date-fns";
 import { Zap, TrendingDown, Leaf, Lightbulb, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Prediction } from "@shared/schema";
+
+// Helper to convert data to CSV format
+const toCSV = (data: (Prediction)[]) => {
+  const headers = ["DATE", "LOCATION OF KWH METERS", "TOTAL READING(KWH)", "Year", "Month", "Quarter", "KWH_Lag_1_used", "KWH_RollingMean_7_used"];
+  const rows = data.map(item => [
+    item.date,
+    item.location,
+    item.TOTAL_READING_KWH,
+    item.Year,
+    item.Month,
+    item.Quarter,
+    item.KWH_Lag_1_used,
+    item.KWH_RollingMean_7_used
+  ].join(','));
+  return [headers.join(','), ...rows].join('\n');
+};
+
+// Helper to trigger CSV download
+const downloadCSV = (csvString: string, filename: string) => {
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};
 
 export default function Predictions() {
   const [selectedLocation, setSelectedLocation] = useState<string>("All");
@@ -26,6 +59,13 @@ export default function Predictions() {
     }
     return acc;
   }, []) || [];
+
+  const handleDownload = () => {
+    if (predictions) {
+      const csvData = toCSV(predictions);
+      downloadCSV(csvData, 'predictions-report.csv');
+    }
+  };
 
   // Comparison data for "Actual vs Predicted" lookalike
   const comparisonData = chartData.map(d => ({
@@ -152,9 +192,9 @@ export default function Predictions() {
               </ul>
             </div>
 
-            <button className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-lg shadow-emerald-500/20">
+            <Button onClick={handleDownload} disabled={predLoading || !predictions} className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-lg shadow-emerald-500/20">
               Download Full Report
-            </button>
+            </Button>
           </CardContent>
         </Card>
       </div>

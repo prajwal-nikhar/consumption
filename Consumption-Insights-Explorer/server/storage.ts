@@ -33,24 +33,24 @@ export class DatabaseStorage implements IStorage {
 
   async getYearlyTrends() {
     const res = await db.select({
-      year: sql<string>`to_char(${consumptionData.date}, 'YYYY')`,
+      year: sql<string>`strftime('%Y', ${consumptionData.date})`,
       consumption: sql<number>`sum(${consumptionData.totalReading})`
     })
     .from(consumptionData)
-    .groupBy(sql`to_char(${consumptionData.date}, 'YYYY')`)
-    .orderBy(sql`to_char(${consumptionData.date}, 'YYYY')`);
+    .groupBy(sql`strftime('%Y', ${consumptionData.date})`)
+    .orderBy(sql`strftime('%Y', ${consumptionData.date})`);
     
     return res.map(r => ({ year: r.year, consumption: Number(r.consumption) }));
   }
 
   async getMonthlyTrends() {
     const res = await db.select({
-      month: sql<string>`to_char(${consumptionData.date}, 'MM')`,
+      month: sql<string>`strftime('%m', ${consumptionData.date})`,
       consumption: sql<number>`sum(${consumptionData.totalReading})`
     })
     .from(consumptionData)
-    .groupBy(sql`to_char(${consumptionData.date}, 'MM')`)
-    .orderBy(sql`to_char(${consumptionData.date}, 'MM')`);
+    .groupBy(sql`strftime('%m', ${consumptionData.date})`)
+    .orderBy(sql`strftime('%m', ${consumptionData.date})`);
     
     return res.map(r => ({ month: r.month, consumption: Number(r.consumption) }));
   }
@@ -73,7 +73,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPredictions(location?: string) {
-    let query = db.select().from(predictions) as any;
+    let query = db.select({
+      id: predictions.id,
+      location: predictions.location,
+      date: predictions.date,
+      predictedConsumption: predictions.predictedConsumption,
+      Year: predictions.Year,
+      Month: predictions.Month,
+      Quarter: predictions.Quarter,
+      KWH_Lag_1_used: predictions.KWH_Lag_1_used,
+      KWH_RollingMean_7_used: predictions.KWH_RollingMean_7_used,
+      TOTAL_READING_KWH: predictions.TOTAL_READING_KWH,
+    }).from(predictions) as any;
     if (location) {
       query = query.where(eq(predictions.location, location));
     }
